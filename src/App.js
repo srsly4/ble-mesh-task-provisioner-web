@@ -32,6 +32,13 @@ function Node({node}) {
 
 
       }}>Unprovision</Button>
+      <Button color="blue" onClick={(e) => {
+        e.preventDefault();
+
+        sendData('otaUpdate', {
+          address: node.address,
+        });
+      }}>OTA Update</Button>
     </Segment>
     <Segment>
       <Header as='h4' content='Enqueue task' />
@@ -105,6 +112,7 @@ const sendData = (id, data={}) => {
 
 let logData = '';
 let currentNodes = [];
+let currentTasks = [];
 
 function App() {
 
@@ -147,7 +155,8 @@ function App() {
           }
           break;
         case 'taskAdded':
-          setTasks([...tasks, data]);
+          currentTasks = [...tasks, data];
+          setTasks(currentTasks);
           break;
       }
 
@@ -184,6 +193,16 @@ function App() {
 
             sendData('scan');
           }}>Scan</Button>
+          <Button onClick={(event) => {
+            event.preventDefault();
+
+            sendData('setTimeBeacon', {enabled: false});
+          }}>Disable time beacons</Button>
+          <Button onClick={(event) => {
+            event.preventDefault();
+
+            sendData('setTimeBeacon', {enabled: true});
+          }}>Enable time beacons</Button>
         </Segment>
         <Segment>
           <Header as='h2' content='Mesh topology' textAlign='left' />
