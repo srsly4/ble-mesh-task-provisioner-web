@@ -6,7 +6,9 @@ import pad from 'pad-left';
 import {Button, Container, Divider, Grid, Header, Input, List, Segment, TextArea} from 'semantic-ui-react';
 
 let socket = null;
-
+const dataToCsvURI = (data) => encodeURI(
+    `data:text/csv;charset=utf-8,${data.map((row, index) =>  row.join(',')).join(`\n`)}`
+);
 
 function Node({node}) {
 
@@ -16,6 +18,16 @@ function Node({node}) {
     time: moment().format('HH:mm'),
     miliseconds: 0,
   })
+
+  const saveNodeTimeResults = (address) => {
+    if (!timeResults[address]) {
+      alert('No given address in time results');
+      return;
+    }
+
+    window.open(dataToCsvURI(timeResults[address]));
+
+  }
 
   return <div>
     <Header as='h3' content={`Node 0x${pad(node.address.toString(16), 4, 0)}`} textAlign="center" />
@@ -39,6 +51,11 @@ function Node({node}) {
           address: node.address,
         });
       }}>OTA Update</Button>
+      <Button color="blue" onClick={(e) => {
+        e.preventDefault();
+
+        saveNodeTimeResults(node.address)
+      }}>Save time results</Button>
     </Segment>
     <Segment>
       <Header as='h4' content='Enqueue task' />
@@ -110,9 +127,26 @@ const sendData = (id, data={}) => {
   }
 }
 
+const startADCTests = () => {
+  setInterval(() => {
+    sendData('taskAdd', {
+      address: 0xFFFF,
+      funcCode: 0xBC,
+      timestamp: moment().add(7, 'seconds').add(756, 'milliseconds').valueOf(),
+    });
+  }, 23000);
+}
+
 let logData = '';
 let currentNodes = [];
 let currentTasks = [];
+const broadcastNode = {
+  address: 0xFFFF,
+}
+
+const timeResults = {};
+
+const SERVER = 'ws://192.168.0.200:8080';
 
 function App() {
 
@@ -153,6 +187,14 @@ function App() {
             currentNodes[idx].recvTime = data.recvTime;
             setNodes([...currentNodes]);
           }
+          if (!timeResults[data.address]) {
+            timeResults[data.address] = [];
+          }
+          timeResults[data.address].push([
+              Date.now(),
+              data.recvTime - data.logicTime,
+              data.logicRate,
+          ]);
           break;
         case 'taskAdded':
           currentTasks = [...tasks, data];
@@ -179,7 +221,7 @@ function App() {
             setSelectedNode(null);
             setConnected(false);
 
-            socket = new WebSocket('ws://localhost:8080');
+            socket = new WebSocket(SERVER);
             socket.onopen = function() {
               setConnected(true);
             }
@@ -203,6 +245,10 @@ function App() {
 
             sendData('setTimeBeacon', {enabled: true});
           }}>Enable time beacons</Button>
+          <Button onClick={(event) => {
+            event.preventDefault();
+            startADCTests();
+          }}>Start ADC testing</Button>
         </Segment>
         <Segment>
           <Header as='h2' content='Mesh topology' textAlign='left' />
@@ -219,6 +265,13 @@ function App() {
                     <List.Description as="a">Addr: 0x{pad(node.address.toString(16), 4, 0)}, Time latency: {node.logicTime ? `${node.recvTime - node.logicTime}ms` : 'unknown'}</List.Description>
                   </List.Content>
                 </List.Item>)) }
+                <List.Item key="all" active={selectedNode === broadcastNode} onClick={() => setSelectedNode(broadcastNode)}>
+                  <List.Icon name='wifi' size="large" verticalAlign="middle" />
+                  <List.Content>
+                    <List.Header as="a">All nodes</List.Header>
+                    <List.Description as="a">Addr: 0xFFFF</List.Description>
+                  </List.Content>
+                </List.Item>
               </List>
             </Grid.Column>
             <Grid.Column textAlign="left">
